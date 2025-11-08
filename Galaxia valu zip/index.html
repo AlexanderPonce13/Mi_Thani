@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>💖 Galaxia de Thani 💫</title>
+  <style>
+    html,body{
+      margin:0;
+      height:100%;
+      background:#000;
+      overflow:hidden;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial;
+      color:#fff;
+    }
+    #galaxy-canvas{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      touch-action:none;
+    }
+
+    /* HUD */
+    .hud{
+      position:fixed;
+      left:10px;
+      right:10px;
+      bottom:10px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      background:rgba(20,15,35,.35);
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:12px;
+      padding:8px 12px;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      box-shadow:0 0 10px rgba(255,255,255,0.08);
+      transition:all .3s ease;
+    }
+    .hud:hover{ box-shadow:0 0 20px rgba(255,255,255,0.25); }
+    .hud button{
+      padding:8px 14px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.15);
+      background:linear-gradient(145deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+      color:#fff;
+      cursor:pointer;
+      transition:all .2s ease;
+    }
+    .hud button:hover{
+      background:rgba(255,255,255,.2);
+      transform:scale(1.05);
+    }
+    .hud input[type=file]{display:none}
+
+    .pill{
+      position:fixed;
+      top:10px;
+      left:50%;
+      transform:translateX(-50%);
+      padding:6px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      color:#fff;
+      font:12px system-ui;
+      animation:fadeIn 2s ease;
+    }
+    @keyframes fadeIn{
+      from{opacity:0;transform:translateX(-50%) translateY(-10px);}
+      to{opacity:1;transform:translateX(-50%) translateY(0);}
+    }
+
+    /* Mensaje central */
+    .centerMessage{
+      position:fixed;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      text-align:center;
+      font-size:26px;
+      font-weight:bold;
+      color:#ffb0f2;
+      text-shadow:0 0 15px #ff6edc, 0 0 40px #ff99ff;
+      opacity:0;
+      animation:fadeInOut 8s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes fadeInOut{
+      0%,100%{opacity:0;}
+      20%,80%{opacity:1;}
+    }
+
+    .error{
+      position:fixed;
+      inset:auto 10px 70px 10px;
+      background:#260015;
+      color:#ffd9f7;
+      border:1px solid #ff8ae5;
+      border-radius:10px;
+      padding:10px;
+      font:12px system-ui;
+      display:none;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+
+<body>
+<canvas id="galaxy-canvas"></canvas>
+
+<div class="pill">🌠 Galaxia de Thani • Arrastra, gira o toca para explorar 💞</div>
+
+<div class="centerMessage">✨ Thani, mi universo gira en torno a ti ✨</div>
+
+<div class="hud">
+  <button id="playBtn1">▶︎ Canción 1</button>
+  <button id="playBtn2">▶︎ Canción 2</button>
+  <input type="file" id="pickFile1" accept="audio/*">
+  <input type="file" id="pickFile2" accept="audio/*">
+  <button id="pickBtn1">Elegir Canción 1</button>
+  <button id="pickBtn2">Elegir Canción 2</button>
+  <audio id="audio1" preload="none"><source id="songSrc1" src="ahi_estabas_tu.mp3" type="audio/mpeg"></audio>
+  <audio id="audio2" preload="none"><source id="songSrc2" src="labios_de_cereza_2.mp3" type="audio/mpeg"></audio>
+</div>
+
+<canvas id="fx" style="position:fixed;inset:0;pointer-events:none;"></canvas>
+
+<script>
+const CONFIG = {
+  phrases: [
+    'Thani 💖','Mi amor infinito ♾️','Tu luz brilla entre galaxias ✨','Mi cielo 🌌',
+    'Tu sonrisa crea estrellas 🌠','Thani eres mi constelación 🌙','Siempre tú ❤️',
+    'Eres mi universo 💫','Contigo todo es magia 🪄','Amor galáctico 💕',
+    'Mi vida 🌸','Te pienso 💭','Te extraño 🫶','Thani 🌹','Gracias por existir ✨'
+  ]
+};
+
+// === AUDIO ===
+const audio1 = document.getElementById('audio1');
+const audio2 = document.getElementById('audio2');
+const playBtn1 = document.getElementById('playBtn1');
+const playBtn2 = document.getElementById('playBtn2');
+const pickFile1 = document.getElementById('pickFile1');
+const pickFile2 = document.getElementById('pickFile2');
+const pickBtn1 = document.getElementById('pickBtn1');
+const pickBtn2 = document.getElementById('pickBtn2');
+
+function stopOther(audioToKeep) {
+  [audio1, audio2].forEach(a => { if (a !== audioToKeep) { a.pause(); a.currentTime = 0; } });
+  playBtn1.textContent = '▶︎ Canción 1';
+  playBtn2.textContent = '▶︎ Canción 2';
+}
+
+playBtn1.onclick = async () => {
+  if (audio1.paused) {
+    stopOther(audio1);
+    await audio1.play();
+    playBtn1.textContent = '⏸︎ Canción 1';
+  } else {
+    audio1.pause();
+    playBtn1.textContent = '▶︎ Canción 1';
+  }
+};
+playBtn2.onclick = async () => {
+  if (audio2.paused) {
+    stopOther(audio2);
+    await audio2.play();
+    playBtn2.textContent = '⏸︎ Canción 2';
+  } else {
+    audio2.pause();
+    playBtn2.textContent = '▶︎ Canción 2';
+  }
+};
+
+pickBtn1.onclick = ()=> pickFile1.click();
+pickBtn2.onclick = ()=> pickFile2.click();
+
+pickFile1.onchange = ()=>{
+  if(pickFile1.files && pickFile1.files[0]){
+    const url = URL.createObjectURL(pickFile1.files[0]);
+    audio1.src = url;
+    audio1.play().then(()=>playBtn1.textContent='⏸︎ Canción 1');
+  }
+};
+pickFile2.onchange = ()=>{
+  if(pickFile2.files && pickFile2.files[0]){
+    const url = URL.createObjectURL(pickFile2.files[0]);
+    audio2.src = url;
+    audio2.play().then(()=>playBtn2.textContent='⏸︎ Canción 2');
+  }
+};
+
+// === WEBGL ===
+const canvas = document.getElementById('galaxy-canvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio||1));
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.set(0,26,110);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Fondo estelar
+function makeStarTexture(size=1024, count=2400){
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const g=c.getContext('2d');
+  g.fillStyle='#080010'; g.fillRect(0,0,size,size);
+  for(let i=0;i<count;i++){
+    const x=Math.random()*size, y=Math.random()*size;
+    g.fillStyle='rgba(255,255,255,'+(Math.random()*0.8)+')';
+    g.fillRect(x,y,1,1);
+  }
+  return new THREE.CanvasTexture(c);
+}
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(600,64,64),
+  new THREE.MeshBasicMaterial({map:makeStarTexture(), side:THREE.BackSide})
+));
+
+// Frases flotantes
+const galaxy=new THREE.Group(); scene.add(galaxy);
+for(let i=0;i<CONFIG.phrases.length*6;i++){
+  const text=CONFIG.phrases[i%CONFIG.phrases.length];
+  const c=document.createElement('canvas');c.width=512;c.height=64;
+  const g=c.getContext('2d');
+  g.font='bold 32px Arial'; g.fillStyle='#fff'; g.textAlign='center';
+  g.fillText(text,256,40);
+  const tex=new THREE.CanvasTexture(c);
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));
+  const angle=i/50*Math.PI*2; const dist=50+Math.random()*40;
+  spr.position.set(Math.cos(angle)*dist,(Math.random()-0.5)*20,Math.sin(angle)*dist);
+  spr.scale.set(15,3,1);
+  galaxy.add(spr);
+}
+
+// Imágenes centrales
+const loader=new THREE.TextureLoader();
+const coreTex=loader.load('favicon.png');
+const ringTex=loader.load('og-cover.png');
+const coreMat=new THREE.MeshBasicMaterial({map:coreTex,transparent:true});
+const core=new THREE.Mesh(new THREE.SphereGeometry(12,64,64),coreMat);
+scene.add(core);
+const ringMat=new THREE.MeshBasicMaterial({map:ringTex,transparent:true,opacity:0.85,side:THREE.DoubleSide});
+const ring=new THREE.Mesh(new THREE.PlaneGeometry(400,400),ringMat);
+ring.rotation.x=-Math.PI/2; scene.add(ring);
+const haloGeo=new THREE.RingGeometry(80,150,64);
+const haloMat=new THREE.MeshBasicMaterial({color:0xffa0e0,transparent:true,opacity:0.2,side:THREE.DoubleSide});
+const halo=new THREE.Mesh(haloGeo,haloMat);
+halo.rotation.x=-Math.PI/2; scene.add(halo);
+
+// Animación
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);
+  galaxy.rotation.y+=0.0015;
+  ring.rotation.z+=0.001;
+  core.rotation.y+=0.002;
+  t+=0.02;
+  halo.material.opacity=0.15+Math.sin(t)*0.1;
+  controls.update();
+  renderer.render(scene,camera);
+}
+animate();
+
+// Efectos visuales
+const fx=document.getElementById('fx');
+const ctx2=fx.getContext('2d');
+function resizeFx(){
+  fx.width=innerWidth*2; fx.height=innerHeight*2;
+  fx.style.width=innerWidth+'px'; fx.style.height=innerHeight+'px';
+}
+resizeFx(); addEventListener('resize',resizeFx);
+const sparks=[];
+function spawn(x,y){ for(let i=0;i<20;i++) sparks.push({x:x*2,y:y*2,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,life:1}); }
+let lastTap=0;
+addEventListener('click',e=>{ if(performance.now()-lastTap<300)spawn(e.clientX,e.clientY); lastTap=performance.now(); });
+addEventListener('touchend',e=>{ const t=e.changedTouches[0]; if(performance.now()-lastTap<300)spawn(t.clientX,t.clientY); lastTap=performance.now(); });
+function loopFx(){
+  ctx2.clearRect(0,0,fx.width,fx.height);
+  for(let i=sparks.length-1;i>=0;i--){
+    const s=sparks[i];
+    s.x+=s.vx; s.y+=s.vy; s.life-=0.02;
+    ctx2.fillStyle='rgba(255,220,180,'+s.life+')';
+    ctx2.beginPath(); ctx2.arc(s.x,s.y,3,0,Math.PI*2); ctx2.fill();
+    if(s.life<=0)sparks.splice(i,1);
+  }
+  requestAnimationFrame(loopFx);
+}
+loopFx();
+</script>
+</body>
+</html>
